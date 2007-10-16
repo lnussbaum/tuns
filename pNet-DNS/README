@@ -1,0 +1,50 @@
+pNet::DNS
+---------
+
+Ruby port of perl Net::DNS.
+
+This project is a direct port of perl Net::DNS, version 0.57.
+It has tried to stick as closely as possible to the original
+perl code, to allow existing perl code to be ported quickly and
+easily to Ruby. This project is not intended to be anything more
+than a direct port of the perl code. 
+
+The perl test code has also been ported to Ruby, and all runs
+successfully. The demo code has also been ported.
+
+No effort has been made to fix bugs in the original perl code -
+this port is as close as possible to the perl.
+
+Author : AlexD
+Contact : alexd@nominet.org.uk
+Copyright (c) Nominet UK, 2006
+
+Check out demo and test folders for examples.
+
+Issues
+------
+
+I've still not had a chance to test on IPv6, so the functionality in
+tc_inet6.rb is untested.
+
+Nameserver.rb is a port of the perl version - bugs and all.
+It's obviously broken, but would not be hard to fix. 
+If you need a working version of this code, please contact me.
+
+JRuby does not yet support TCP, although UDP is fully supported.
+
+
+PERL AUTHOR INFORMATION
+-----------------------
+
+Net::DNS is currently maintained at NLnet Labs (www.nlnetlabs.nl) by:
+        Olaf Kolkman and his team.
+	olaf at net-dns.org
+
+Between 2002 and 2004 Net::DNS was maintained by:
+       Chris Reinhardt
+
+
+Net::DNS was created by:
+	Michael Fuhr
+	mike at fuhr.org 

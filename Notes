@@ -1,0 +1,40 @@
+Coté client:
+Envoyer un paquet quand il y a des données.
+Envoyer un paquet si pas de données depuis plus d'un certain délai
+(+exponential increase of delay. delai init configurable)
+Client: Sn, An, Length
++ Timeout configurable avant retransmission (1 sec ?)
++ Window. (min, max, increase configurables) Comment fait TCP?
++ Max number of packets on the fly (1 = safe)
+
+Question: labels commencant par une lettre?
+
+Coté serveur:
+Répondre avec données.
+Positionner Data Waiting à 1 si nécessaire
+
+255-15
+
+240 caractères significatifs
+5 bits par caractère (32 possibilités) 2^5 = 32
+=> 240*5 = 1200 bits par message
+150 octets par message...
+
+Toujours transférer des octets entiers.
+Infos à fournir dans chaque paquet:
+Type: 3 bits
+Client ID: 2 bits
+Sn, An: 15 bits * 2
+Len: 10 bits
+
+Types:
+- HELLO Re: HELLO
+  2 caract + clé sur 2 caract. Init Sn - 1.
+  Re: Hello: client ID. init An - 1. An.
+- BYE
+  Client ID. Bit flip de DW.
+- PING
+- DATA
+- DATA+DW
+
+5 + 30 + 10 = 45 + 5=> 10 caract pour l'en-tete

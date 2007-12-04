@@ -3,7 +3,6 @@
 require 'socket'
 require 'Net/DNS'
 
-
 ###
 # 4.2.1 UDP usage
 # Messages carried by UDP are restricted to 512 bytes (not counting the IP

@@ -6,37 +6,107 @@ require 'timeout'
 require 'Net/DNS'
 require 'thread'
 require 'dns'
+require 'optparse'
 
-Thread::abort_on_exception = true
+PKTSIZE=2000
 
-tun = File::new('/dev/net/tun', File::RDWR)
-dev = tun_allocate(tun)
-system("ifconfig #{dev} 192.168.53.2 mtu 140 up")
-system("route add -net 192.168.53.0/24 dev #{dev}")
+$bindaddr='0.0.0.0'
+$bindport=53
+$ip="192.168.53.2"
+$rip="192.168.53.1"
+$sdomain=nil
+$rdomain=nil
+$mtu=nil
+$debug = false
 
-PKTSIZE=4096
-SERVERADDR=ARGV[0]
-socket = UDPSocket.new
-socket.bind(SERVERADDR, 53) 
+progname = File::basename($PROGRAM_NAME)
+opts = OptionParser::new do |opts|
+  opts.program_name = progname
+  opts.banner = "Usage: #{progname} [options]"
+  opts.separator ""
+  opts.separator "Mandatory options:"
+  opts.on("-s", "--send-domain DOMAIN", "Domain name to use to send data") do |n|
+    $sdomain = n
+  end
+  opts.on("-r", "--receive-domain DOMAIN", "Domain name to use to receive data") do |n|
+    $rdomain = n
+  end
+  opts.separator "   Note that the two previous options should be set to the opposite values"
+  opts.separator "   in the client."
+  opts.separator ""
+  opts.separator "Verbosity options:"
+  opts.on("-d", "--debug", "Debug mode") do |d|
+    $debug = true
+    $quiet = false
+  end
+  opts.separator ""
+  opts.separator "Overriding default values:"
+  opts.on("-m", "--mtu MTU", "MTU for tun device (overrides default calculation based on domain names)") do |m|
+    $mtu = m.to_i
+  end
+  opts.on("-b", "--bind-address ADDR", "Address to bind to. By default, binds to 0.0.0.0 (all interfaces)") do |s|
+    $bindaddr = s
+  end
+  opts.on("-p", "--bind-port PORT", "Port to bind to. By default, binds to port 53") do |s|
+    $bindport = s
+  end
+  opts.on("-i", "--ip", "IP for tun device") do |i|
+    $ip = i
+  end
+  opts.on("-t", "--remote-ip", "IP for other endpoint on tun") do |i|
+    $rip = i
+  end
+end
+begin
+  opts.parse!(ARGV)
+rescue OptionParser::ParseError => pe
+  opts.warn pe
+  puts opts
+  exit 1
+end
 
-DEBUG = false
+if $sdomain.nil? or $rdomain.nil?
+  puts "ERROR: Domains to send and receive data (--send-domain and --receive-domain)"
+  puts "       must be specified."
+  puts
+  puts opts
+  exit 1
+end
 
-queue = []
-qmutex = Mutex::new
 
-th_readtun = Thread::new(socket, tun) do |socket, tun|
-  while (s = tun.sysread(2000))
-    if s.length > 160
+# creates and configure tun device
+if $mtu.nil?
+  $mtu = 140 # FIXME
+end
+$tun = File::new('/dev/net/tun', File::RDWR)
+dev = tun_allocate($tun)
+system("ifconfig #{dev} #{$ip} mtu #{$mtu} up")
+system("route add -host #{$rip} dev #{dev}")
+
+# creates and configure listening socket
+$socket = UDPSocket.new
+$socket.bind($bindaddr, $bindport) 
+
+# queue of packets to send
+$queue = []
+$qmutex = Mutex::new
+
+# thread that reads from tun and writes to queue
+th_readtun = Thread::new($socket, $tun) do |socket, tun|
+  Thread::current.abort_on_exception = true
+  while (s = tun.sysread(PKTSIZE))
+    if s.length > $mtu
       puts "Packet too long (#{s.length}) !!"
       exit(1)
     end
     packet = dns_encode(s)
-    qmutex.synchronize do
-      queue.push(packet)
+    $qmutex.synchronize do
+      $queue.push(packet)
     end
   end
 end
 
+# function to build reply to query
 def build_reply(q)
   quest = q.question[0]
   rep = Net::DNS::Packet::new_from_values(quest.qname, quest.qtype, 'IN')
@@ -49,12 +119,14 @@ def build_reply(q)
   rep
 end
 
-th_read = Thread::new(socket, tun) do |socket, tun|
+# thread that reads from socket and writes to tun
+th_read = Thread::new($socket, $tun) do |socket, tun|
+  Thread::current.abort_on_exception = true
   while recvdata = socket.recvfrom(PKTSIZE)
     rpack, sender = recvdata
     dnsp = Net::DNS::Packet::new_from_binary(rpack)
     q = dnsp.question[0]
-    if DEBUG
+    if $debug
       puts "*" * 25 + 'RECEIVED' + '*' * 25
       p dnsp
     end
@@ -63,31 +135,31 @@ th_read = Thread::new(socket, tun) do |socket, tun|
       puts "Invalid packet type: #{q.qtype}"
       next
     end
-    if q.qname =~ /\.t\.blop\.info$/
+    if q.qname =~ /\.#{$rdomain}$/ # FIXME
       # we are receiving a packet
-      text = q.qname.gsub(/\.t\.blop\.info$/, '')
+      text = q.qname.gsub(/\.#{$rdomain}$/, '') # FIXME
       pack = dns_decode(text)
       tun.syswrite(pack)
-      length = qmutex.synchronize { queue.length }
+      length = $qmutex.synchronize { $queue.length }
       rep.answer << Net::DNS::RR::new_from_hash(
         :name => q.qname,
         :ttl => 0,
         :type => 'CNAME',
         :cls => 'IN',
-        :cname => "length#{length}.t.blop.info"
+        :cname => "length#{length}.#{$rdomain}"
       ) 
       rep.header.ancount = 1
-    elsif q.qname =~ /\.u\.blop\.info$/
-      qmutex.synchronize do
+    elsif q.qname =~ /\.#{$sdomain}$/ # FIXME
+      $qmutex.synchronize do
         # we are given the chance to send something!
-        if queue.length > 0
-          text = queue.shift
+        if $queue.length > 0
+          text = $queue.shift
           rep.answer << Net::DNS::RR::new_from_hash(
             :name => q.qname,
             :ttl => 0,
             :type => 'CNAME',
             :cls => 'IN',
-            :cname => "#{text}.u.blop.info"
+            :cname => "#{text}.#{$sdomain}"
           )
         else 
           rep.answer << Net::DNS::RR::new_from_hash(
@@ -95,7 +167,7 @@ th_read = Thread::new(socket, tun) do |socket, tun|
             :ttl => 0,
             :type => 'CNAME',
             :cls => 'IN',
-            :cname => "zero.u.blop.info"
+            :cname => "zero.#{$sdomain}"
           )
         end
       end
@@ -104,7 +176,7 @@ th_read = Thread::new(socket, tun) do |socket, tun|
       puts "Unknown QNAME! #{q.qname}"
       next
     end
-    if DEBUG
+    if $debug
       puts "*" * 25 + 'SENDING' + '*' * 25
       p rep
     end
@@ -112,6 +184,7 @@ th_read = Thread::new(socket, tun) do |socket, tun|
   end
 end
 
+# wait for all threads to finish
 th_readtun.join
 th_readdns.join
 

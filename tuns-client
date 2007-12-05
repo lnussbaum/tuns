@@ -7,95 +7,192 @@ require 'Net/DNS'
 require 'base32'
 require 'thread'
 require 'dns'
+require 'optparse'
 
-Thread::abort_on_exception = true
+## Possible tags in non-quiet mode
+# S we are sending a data packet
+# R we just received a data packet
+# > we are sending a request for data (polling)
+# T no packet was received. we will send a request for data again.
+# #ANCOUNT# answer packet, but without any anwer, received
+# . we received an ack for a data packet we sent
+# + we are sending additional request packets
+# S(delay) we are sleeping, since server has nothing for us
 
 RECV_TIMEOUT = 0.5
-DELAY_MIN = 0
 DELAY_INCR = 0.1
-DELAY_MAX = 2
-MIN_ONFLY=2
-MAX_ONFLY=40
-MTU=140
+DELAY_MAX = 2 # max delay before polls
+MIN_ONFLY=3
+MAX_ONFLY=40 # max number of reqs on the fly
+PKTSIZE=2000
 
-DEBUG = false
+$mtu=nil
+$debug=false
+$quiet=false
+$sdomain=nil
+$rdomain=nil
+$server =  nil
+$ip = "192.168.53.1"
+$rip = "192.168.53.2"
 
-PKTSIZE=4096
+progname = File::basename($PROGRAM_NAME)
+opts = OptionParser::new do |opts|
+  opts.program_name = progname
+  opts.banner = "Usage: #{progname} [options]"
+  opts.separator ""
+  opts.separator "Mandatory options:"
+  opts.on("-s", "--send-domain DOMAIN", "Domain name to use to send data") do |n|
+    $sdomain = n
+  end
+  opts.on("-r", "--receive-domain DOMAIN", "Domain name to use to receive data") do |n|
+    $rdomain = n
+  end
+  opts.separator "   Note that the two previous options should be set to the opposite values"
+  opts.separator "   in the client."
+  opts.separator ""
+  opts.separator "Verbosity options:"
+  opts.on("-q", "--quiet", "Quiet mode") do |q|
+    $quiet = true
+    $debug = false
+  end
+  opts.on("-d", "--debug", "Debug mode") do |d|
+    $debug = true
+    $quiet = false
+  end
+  opts.separator ""
+  opts.separator "Overriding default values:"
+  opts.on("-m", "--mtu MTU", "MTU for tun device (overrides default calculation based on domain names)") do |m|
+    $mtu = m.to_i
+  end
+  opts.on("-n", "--nameserver SERVER", "Nameserver to use. By default, use first entry from /etc/resolv.conf") do |s|
+    $server = s
+  end
+  opts.on("-i", "--ip", "IP for tun device") do |i|
+    $ip = i
+  end
+  opts.on("-t", "--remote-ip", "IP for other endpoint on tun") do |i|
+    $rip = i
+  end
+end
+begin
+  opts.parse!(ARGV)
+rescue OptionParser::ParseError => pe
+  opts.warn pe
+  puts opts
+  exit 1
+end
 
-tun = File::new('/dev/net/tun', File::RDWR)
-dev = tun_allocate(tun)
-system("ifconfig #{dev} 192.168.53.1 mtu #{MTU} up")
-system("route add -net 192.168.53.0/24 dev #{dev}")
-system("sudo sysctl -w net.ipv4.tcp_frto=1") # better for lossy links
+if $sdomain.nil? or $rdomain.nil?
+  puts "ERROR: Domains to send and receive data (--send-domain and --receive-domain)"
+  puts "       must be specified."
+  puts
+  puts opts
+  exit 1
+end
 
-server = ARGV[0]
+# creates and configure tun device
+if $mtu.nil?
+  $mtu = 140 # FIXME
+end
+$tun = File::new('/dev/net/tun', File::RDWR)
+dev = tun_allocate($tun)
+system("ifconfig #{dev} #{$ip} mtu #{$mtu} up")
+system("route add -host #{$rip} dev #{dev}")
+system("sysctl -w net.ipv4.tcp_frto=1") # better for lossy links
+
+# creates and configure socket to server
+if $server.nil?
+  s = IO::read('/etc/resolv.conf').split(/\n/).grep(/^nameserver /)
+  if s.length == 0
+    puts "No nameservers in /etc/resolv.conf, exiting."
+    exit 1
+  end
+  $server = s[0].split(' ')[1]
+  puts "Using nameserver #{$server}"
+end
+
 UDPSocket.do_not_reverse_lookup = true
-socket = UDPSocket.new
-socket.connect(server, 53)
+$socket = UDPSocket.new
+$socket.connect($server, 53)
 $smutex = Mutex::new
-
 $schedmutex = Mutex::new
-$onfly = 0
+# state variables
+$onfly = 0 # number of packets currently on the fly
+$num_nothing = 0 # number of successive reqs with nothing in remote queue
+$num_req = 0 # number of requests. used to generate diff queries each time
 
-th_send = Thread::new(socket, tun) do |socket, tun|
-  while (s = tun.sysread(2000))
-    if s.length > 160
+# Thread that reads from tun and sends to DNS
+th_send = Thread::new($socket, $tun) do |socket, tun|
+  Thread::current.abort_on_exception = true
+  while (s = tun.sysread(PKTSIZE))
+    if s.length > $mtu
       puts "Packet too long (#{s.length}) !!"
       exit(1)
     end
     packet = dns_encode(s)
-    dnspacket = Net::DNS::Packet::new_from_values("#{packet}.t.blop.info", 'CNAME', 'IN')
+    dnspacket = Net::DNS::Packet::new_from_values("#{packet}.#{$sdomain}", 'CNAME', 'IN')
     $smutex.synchronize do
-      if DEBUG
-      puts "*" * 25 + ' SENDING DATA ' + '*' * 25
-      p dnspacket
+      if $debug
+        puts "*" * 25 + ' SENDING DATA ' + '*' * 25
+        p dnspacket
+      end
+      if not $quiet
+        print 'S'
+        STDOUT.flush
       end
       socket.send(dnspacket.data, 0)
     end
   end
 end
 
-$num_nothing = 0
-$num_req = 0
-
+# function to send a request for data
 def sendreq(socket)
-  dnspacket = Net::DNS::Packet::new_from_values("d#{$num_req}.u.blop.info", 'CNAME', 'IN')
   $smutex.synchronize do
+    dnspacket = Net::DNS::Packet::new_from_values("d#{$num_req}.#{$rdomain}", 'CNAME', 'IN')
     $num_req += 1
-    if DEBUG
+    if $debug
       puts "*" * 25 + ' SENDING REQ ' + '*' * 25
     end
-    socket.send(dnspacket.data,0)
+    if $quiet
+      print '>'
+      STDOUT.flush
+    end
+    socket.send(dnspacket.data, 0)
     $schedmutex.synchronize do
       $onfly += 1
     end
-    print '>'
-    STDOUT.flush
   end
 end
 
-th_recv = Thread::new(socket, tun) do |socket, tun|
+# thread that reads on DNS and writes to tun
+th_recv = Thread::new($socket, $tun) do |socket, tun|
+  Thread::current.abort_on_exception = true
   sendreq(socket)
   while true
     ans, from = nil
     begin
       Timeout::timeout(RECV_TIMEOUT) do
-        ans, from = socket.recvfrom(PKTSIZE/4)
+        ans, from = socket.recvfrom(PKTSIZE)
       end
     rescue Timeout::Error
-      print 'T'
-      STDOUT.flush
+      if not $quiet
+        print 'T'
+        STDOUT.flush
+      end
       sendreq(socket)
       next
     end
     resp = Net::DNS::Packet.new_from_binary(ans)
-    if DEBUG
+    if $debug
       puts "*" * 25 + ' RECEIVED ' + '*' * 25
       p resp
     end
     if resp.header.ancount != 1
-      print "#ANCOUNT#"
-      sendreq(socket)
+      if not $quiet
+        print "#ANCOUNT#"
+        STDOUT.flush
+        sendreq(socket)
+      end
       next
     end
     if 'CNAME' != resp.answer[0].type
@@ -103,10 +200,13 @@ th_recv = Thread::new(socket, tun) do |socket, tun|
       exit(1)
     end
     text = resp.answer[0].cname
-    if text =~/t.blop.info$/
-      print '.'
-      STDOUT.flush
-      length = text.gsub(/^length(\d+).t.blop.info$/, '\1').to_i
+    if text =~ /\.#{$sdomain}$/ # FIXME
+      # it's an ack for data we sent
+      if not $quiet
+        print '.'
+        STDOUT.flush
+      end
+      length = text.gsub(/^length(\d+)\..*$/, '\1').to_i
       diff = nil
       $schedmutex.synchronize do
         diff = length - $onfly + 1
@@ -116,47 +216,57 @@ th_recv = Thread::new(socket, tun) do |socket, tun|
       end
       (1..diff).each do
         # send reqs for additional packets
-        print '+'
-        STDOUT.flush
+        if not $quiet
+          print '+'
+          STDOUT.flush
+        end
         sendreq(socket)
       end
       next
-    elsif text !~ /u.blop.info$/
-      puts "response unknown: #{text}"
-      next
-    end
-    text.gsub!(/\.u\.blop\.info$/,'')
-    $schedmutex.synchronize do
-      $onfly -= 1
-    end
-    if text == 'zero'
-      $num_nothing += 1
-      delay = DELAY_MIN + ($num_nothing - 30) * DELAY_INCR
-      if delay > DELAY_MAX
-        delay = DELAY_MAX
+
+    elsif text =~ /\.#{$rdomain}$/ # FIXME
+      # it's a data packet 
+      text.gsub!(/\.#{$rdomain}$/,'') # FIXME
+      $schedmutex.synchronize do
+        $onfly -= 1
       end
-      if delay > 0
-        print "S(#{delay})"
-        STDOUT.flush
-        sleep delay
-        $schedmutex.lock
-        if $onfly < MIN_ONFLY 
-          $schedmutex.unlock
-          sendreq(socket)
-        else
-          $schedmutex.unlock
+      if text == 'zero'
+        $num_nothing += 1
+        delay = ($num_nothing - MAX_NOTHING) * DELAY_INCR
+        if delay > DELAY_MAX
+          delay = DELAY_MAX
         end
+        if delay > 0
+          if not $quiet
+            print "S(#{delay})"
+            STDOUT.flush
+          end
+          sleep delay
+          $schedmutex.lock
+          if $onfly < MIN_ONFLY 
+            $schedmutex.unlock
+            sendreq(socket)
+          else
+            $schedmutex.unlock
+          end
+        end
+      else
+        sendreq(socket)
+        $num_nothing = 0
+        if not $quiet
+          print 'R'
+          STDOUT.flush
+        end
+        pack = dns_decode(text)
+        tun.syswrite(pack)
       end
     else
-      sendreq(socket)
-      $num_nothing = 0
-      print '<'
-      STDOUT.flush
-      pack = dns_decode(text)
-      tun.syswrite(pack)
+      puts "response unknown: #{text}"
+      next
     end
   end
 end
 
+# wait until all threads finish
 th_recv.join
 th_send.join

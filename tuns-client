@@ -174,7 +174,6 @@ def sendreqs(socket, length, zero = false)
       diff = [ length, MAX_ONFLY ].min - $onfly
     end
   end
-  puts "\ndiff: #{diff} #{length} #{$onfly}\n"
   (1..diff).each do
     # send reqs for additional packets
     if not $quiet and diff > 1
@@ -264,7 +263,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           end
           sleep delay
         end
-        sendreqs(socket, MIN_ONFLY, true)
+        sendreqs(socket, MIN_ONFLY, $num_nothing > MAX_NOTHING)
       else
         sendreqs(socket, MIN_ONFLY)
         $num_nothing = 0

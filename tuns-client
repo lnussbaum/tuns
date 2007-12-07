@@ -142,6 +142,7 @@ th_send = Thread::new($socket, $tun) do |socket, tun|
         STDOUT.flush
       end
       socket.send(dnspacket.data, 0)
+      $num_nothing = 0
     end
   end
 end

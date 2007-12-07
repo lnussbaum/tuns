@@ -241,7 +241,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
         $onfly -= 1
       end
       # There's nothing waiting on the remote side
-      if text == 'zero'
+      if text == 'zero' and $onfly <= MIN_ONFLY
         $num_nothing += 1
         if not $quiet
           print "0"

@@ -1,0 +1,35 @@
+TUNS - a simple IP over DNS tunnel
+==================================
+(c) Lucas Nussbaum <lucas@lucas-nussbaum.net>
+Licensed under GPL v3 or later (see COPYING file)
+
+TUNS is a prototype implementation of an IP over DNS tunnel. It is provided
+here in the interest of reproducibility of scientific results, so that
+evaluations that were carried out can be reproduced by others.
+
+Its main features are:
+- simplicity: it's thought to be as simple as possible.
+  + no complex DNS stuff (TXT records, EDNS0, ...) ; uses only CNAME records
+  + no splitting of IP packets: sets the MTU and forgets about it
+- efficiency
+  + it's optimized for low latency
+
+Usage
+-----
+You need to delegate two DNS zones (using NS records) to the system where TUNS
+will run. One of them will be used to send packets, and the other one will be
+used to receive packets. In the following example, we use up.tuns.net and
+do.tuns.net.
+
+Client: as root, run tuns-client -s up.tuns.net -r do.tuns.net
+Server: as root, run tuns-server -s do.tuns.net -r up.tuns.net
+
+By default, the client runs in verbose mode. Use the -q option to run in
+quiet mode.
+
+There's a number of possible options you can use to change default values.
+See tuns-client -h and tuns-server -h
+
+Troubleshooting
+---------------
+TODO

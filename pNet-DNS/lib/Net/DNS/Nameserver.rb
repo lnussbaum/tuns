@@ -297,7 +297,8 @@ module Net
         
         query = Net::DNS::Packet.new_from_binary(buf)
         
-        reply = make_reply(query, peerhost) || return
+        reply = make_reply(query, peerhost)
+        return if not reply
         reply_data = reply.data
         
         #        local $| = 1 if @verbose

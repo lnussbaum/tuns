@@ -177,7 +177,8 @@ module Net
         type  = 'SOA'
         klass  ||= 'IN'
         
-        packet = Packet.new_from_values(zone, type, klass) || return
+        packet = Packet.new_from_values(zone, type, klass)
+        return if not packet
         
         packet.header.opcode=('UPDATE')
         packet.header.rd=(0)

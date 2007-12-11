@@ -554,7 +554,8 @@ module Net
         resolver = Net::DNS::Resolver.new
       end
       
-      ans = resolver.query(name, 'MX', klass) || return;
+      ans = resolver.query(name, 'MX', klass)
+      return if not ans
       
       # This construct is best read backwords.
       #

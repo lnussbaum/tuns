@@ -22,10 +22,10 @@ require 'optparse'
 RECV_TIMEOUT = 0.3
 DELAY_INCR = 0.1
 DELAY_MAX = 2 # max delay before polls
-MIN_ONFLY=3
-MAX_ONFLY=40 # max number of reqs on the fly
+MIN_ONFLY=8
+MAX_ONFLY=80 # max number of reqs on the fly
 PKTSIZE=2000
-MAX_NOTHING=40
+MAX_NOTHING=50
 
 $mtu=nil
 $debug=false

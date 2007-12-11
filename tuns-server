@@ -9,7 +9,7 @@ require 'dns'
 require 'optparse'
 
 PKTSIZE=2000
-$max_sleep=1.0
+$max_sleep=2.0
 $bindaddr='0.0.0.0'
 $bindport=53
 $ip="192.168.53.2"
@@ -152,7 +152,7 @@ $th_writedns = Thread::new($socket) do |socket|
       if $queue.length == 0
         if $reqqueue.length == 0
           $need_send.wait($qmutex)
-        elsif (Time::now - $reqqueue[0][4]) > $max_sleep
+        elsif $reqqueue.length > 1 and (Time::now - $reqqueue[0][4]) > $max_sleep
           # we need to send a zero packet
           q, rep, sender_addr, sender_port, age = $reqqueue.shift
           rep.answer << Net::DNS::RR::new_from_hash(

@@ -19,13 +19,13 @@ require 'optparse'
 # + we are sending additional request packets
 # S(delay) we are sleeping, since server has nothing for us
 
-RECV_TIMEOUT = 0.3
+RECV_TIMEOUT = 1.0
 DELAY_INCR = 0.1
 DELAY_MAX = 2 # max delay before polls
-MIN_ONFLY=8
-MAX_ONFLY=80 # max number of reqs on the fly
+MIN_ONFLY=6
+MAX_ONFLY=50 # max number of reqs on the fly
 PKTSIZE=2000
-MAX_NOTHING=50
+MAX_NOTHING=60
 
 $mtu=nil
 $debug=false

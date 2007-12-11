@@ -9,7 +9,7 @@ require 'dns'
 require 'optparse'
 
 PKTSIZE=2000
-
+$max_sleep=1.0
 $bindaddr='0.0.0.0'
 $bindport=53
 $ip="192.168.53.2"
@@ -90,9 +90,10 @@ $socket.bind($bindaddr, $bindport)
 # queue of packets to send
 $queue = []
 $qmutex = Mutex::new
+$need_send = ConditionVariable::new
 
 # thread that reads from tun and writes to queue
-th_readtun = Thread::new($socket, $tun) do |socket, tun|
+$th_readtun = Thread::new($socket, $tun) do |socket, tun|
   Thread::current.abort_on_exception = true
   while (s = tun.sysread(PKTSIZE))
     if s.length > $mtu
@@ -102,6 +103,7 @@ th_readtun = Thread::new($socket, $tun) do |socket, tun|
     packet = dns_encode(s)
     $qmutex.synchronize do
       $queue.push(packet)
+      $need_send.signal
     end
   end
 end
@@ -120,7 +122,7 @@ def build_reply(q)
 end
 
 # thread that reads from socket and writes to tun
-th_read = Thread::new($socket, $tun) do |socket, tun|
+$th_readdns = Thread::new($socket, $tun) do |socket, tun|
   Thread::current.abort_on_exception = true
   while recvdata = socket.recvfrom(PKTSIZE)
     rpack, sender = recvdata
@@ -150,28 +152,38 @@ th_read = Thread::new($socket, $tun) do |socket, tun|
       ) 
       rep.header.ancount = 1
     elsif q.qname =~ /\.#{$sdomain}$/ # FIXME
+      # prepare answer.
+      rep.answer << Net::DNS::RR::new_from_hash(
+        :name => q.qname,
+        :ttl => 0,
+        :type => 'CNAME',
+        :cls => 'IN',
+        :cname => "zero.#{$sdomain}"
+      )
+      rep.header.ancount = 1
+
       $qmutex.synchronize do
         # we are given the chance to send something!
-        if $queue.length > 0
-          text = $queue.shift
-          rep.answer << Net::DNS::RR::new_from_hash(
-            :name => q.qname,
-            :ttl => 0,
-            :type => 'CNAME',
-            :cls => 'IN',
-            :cname => "#{text}.#{$sdomain}"
-          )
-        else 
-          rep.answer << Net::DNS::RR::new_from_hash(
-            :name => q.qname,
-            :ttl => 0,
-            :type => 'CNAME',
-            :cls => 'IN',
-            :cname => "zero.#{$sdomain}"
-          )
+        if $queue.length == 0
+          puts "Sleeping until there's something to send."
+          th_sleep = Thread::new do
+            sleep $max_sleep
+            $need_send.signal
+          end
+          $need_send.wait($qmutex)
+          th_sleep.kill if th_sleep.alive?
         end
       end
-      rep.header.ancount = 1
+      text = nil
+      $qmutex.synchronize do
+        if $queue.length > 0
+          puts "Something in queue now!"
+          text = $queue.shift
+        end
+      end
+      if text
+        re.answer.cname = "#{text}.#{$sdomain}"
+      end
     else
       puts "Unknown QNAME! #{q.qname}"
       next
@@ -185,6 +197,6 @@ th_read = Thread::new($socket, $tun) do |socket, tun|
 end
 
 # wait for all threads to finish
-th_readtun.join
-th_readdns.join
+$th_readtun.join
+$th_readdns.join
 

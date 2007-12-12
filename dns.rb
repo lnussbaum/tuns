@@ -23,5 +23,11 @@ def dns_encode(pack)
 end
 
 def dns_decode(text)
-  return Base32::decode(dns_unsplit(text))
+  begin
+    return Base32::decode(dns_unsplit(text))
+  rescue
+    puts $!
+    puts text
+  end
+
 end

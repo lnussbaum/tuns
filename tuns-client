@@ -144,6 +144,7 @@ th_send = Thread::new($socket, $tun) do |socket, tun|
       socket.send(dnspacket.data, 0)
       $num_nothing = 0
     end
+    sendreq(socket)
   end
 end
 
@@ -242,7 +243,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
         $onfly -= 1
       end
       # There's nothing waiting on the remote side
-      if text == 'zero' and $onfly <= MIN_ONFLY
+      if text == 'zero'
         $num_nothing += 1
         if not $quiet
           print "0"

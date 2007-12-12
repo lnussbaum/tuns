@@ -14,6 +14,23 @@ Its main features are:
 - efficiency
   + it's optimized for low latency
 
+Please note that using TUNS on networks that you don't totally control is
+illegal in many country. As stated above, TUNS is only provided so that you can
+reproduce results obtained with it, in experimental setups. If you take the
+decision to use it for something else, the author of TUNS can't be held
+responsible. If you are unsure, please consult with a lawyer.
+
+Installation
+------------
+There's no real installation script.
+* uncompress the tarball.
+* build base32.so:
+  cd base32-0.1.1
+  rake
+  cd ..
+  cp base32-0.1.1/ext/base32.so .
+* then you can run tuns-client or tuns-server. (see below)
+
 Usage
 -----
 You need to delegate two DNS zones (using NS records) to the system where TUNS
@@ -33,3 +50,11 @@ See tuns-client -h and tuns-server -h
 Troubleshooting
 ---------------
 TODO
+
+License
+-------
+The base32 module is licensed under a permissive non-copylefted free software
+license (see http://base32.rubyforge.org/svn/trunk/COPYING -- the COPYING file
+wasn't included in the base32 tarball).
+
+TUNS is licensed under GPL v3, or any later version. See the COPYING file.

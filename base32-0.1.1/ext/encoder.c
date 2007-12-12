@@ -104,5 +104,5 @@ base32_encode (uint8_t *output, const size_t outputLength,
   for (i = 0; i < quintets; i++)
     output[i] = base32_encoder_encode_at_position (i, input);
   for (i = quintets; i < outputLength; i++)
-    output[i] = '9';
+    output[i] = '=';
 }

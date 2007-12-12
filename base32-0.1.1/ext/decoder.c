@@ -72,7 +72,7 @@ base32_decode (uint8_t *output, const size_t outputLength, const uint8_t *input,
     output[bytes] += currentByte >> 2;
     output[bytes + 1] = (currentByte & 0x03) << 6;
 
-    if (input[offset + 2] == '9')
+    if (input[offset + 2] == '=')
       return bytes + 1;
     else
       bytes++;
@@ -82,7 +82,7 @@ base32_decode (uint8_t *output, const size_t outputLength, const uint8_t *input,
     output[bytes] += currentByte >> 4;
     output[bytes + 1] = currentByte << 4;
 
-    if (input[offset + 4] == '9')
+    if (input[offset + 4] == '=')
       return bytes + 1;
     else
       bytes++;
@@ -91,7 +91,7 @@ base32_decode (uint8_t *output, const size_t outputLength, const uint8_t *input,
     output[bytes] += currentByte >> 1;
     output[bytes + 1] = currentByte << 7;
 
-    if (input[offset + 5] == '9')
+    if (input[offset + 5] == '=')
       return bytes + 1;
     else
       bytes++;
@@ -101,7 +101,7 @@ base32_decode (uint8_t *output, const size_t outputLength, const uint8_t *input,
     output[bytes] +=  currentByte >> 3;
     output[bytes + 1] = (currentByte & 0x07) << 5;
 
-    if (input[offset + 7] == '9')
+    if (input[offset + 7] == '=')
       return bytes + 1;
     else
       bytes++;

@@ -49,7 +49,8 @@ See tuns-client -h and tuns-server -h
 
 Troubleshooting
 ---------------
-TODO
+The meaning of characters output in client's verbose mode is documented at the
+start of the tuns-client file. It can help to understand what's wrong.
 
 License
 -------

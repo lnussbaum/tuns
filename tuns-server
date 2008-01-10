@@ -224,7 +224,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
     end
     rep = build_reply(dnsp)
     if q.qtype != 'CNAME'
-      puts "Invalid packet type: #{q.qtype}"
+      puts "Invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
       next
     end
     if q.qname =~ /\.#{$rdomain}$/ # FIXME

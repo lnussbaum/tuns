@@ -15,15 +15,16 @@ Its main features are:
   + it's optimized for low latency
 
 Please note that using TUNS on networks that you don't totally control is
-illegal in many country. As stated above, TUNS is only provided so that you can
-reproduce results obtained with it, in experimental setups. If you take the
+illegal in many countries. As stated above, TUNS is only provided so that you
+can reproduce results obtained with it, in experimental setups. If you take the
 decision to use it for something else, the author of TUNS can't be held
 responsible. If you are unsure, please consult with a lawyer.
 
 Installation
 ------------
-There's no real installation script.
+There is no real installation script.
 * uncompress the tarball.
+* install packages needed to build base32.so (in Debian: rake, ruby1.8-dev)
 * build base32.so:
   cd base32-0.1.1
   rake

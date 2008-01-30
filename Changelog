@@ -1,6 +1,7 @@
 TUNS XXX
 --------
 * Added source address for invalid reqs
+* Fixed dns encoding to avoid using '='.
 
 TUNS 0.9 (20/12/2007)
 ---------------------

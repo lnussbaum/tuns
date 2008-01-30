@@ -37,12 +37,12 @@ def dns_unsplit(data)
 end
 
 def dns_encode(pack)
-  return dns_split(Base32::encode(pack))
+  return dns_split(Base32::encode(pack).gsub(/=/,'0'))
 end
 
 def dns_decode(text)
   begin
-    return Base32::decode(dns_unsplit(text))
+    return Base32::decode(dns_unsplit(text).gsub(/0/,'='))
   rescue
     puts $!
     puts text

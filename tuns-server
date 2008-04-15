@@ -33,6 +33,7 @@ $rip="192.168.53.1"
 $domain=nil
 $mtu=nil
 $debug = false
+$dnums = {}
 
 progname = File::basename($PROGRAM_NAME)
 opts = OptionParser::new do |opts|
@@ -237,7 +238,11 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         # we are given the chance to send something!
         num = text.gsub(/^r(\d+)$/, '\1')
         num = num.to_i
-        puts num
+        if $dnums[num]
+          puts "Duplicate download request received: #{num}"
+        else
+          $dnums[num] = true
+        end
         $qmutex.synchronize do
           $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
           $need_wakeup.signal

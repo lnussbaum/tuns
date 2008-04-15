@@ -220,9 +220,9 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
       next
     end
     if q.qname =~ /\.#{$domain}$/
+      text = q.qname.gsub(/\.#{$domain}$/, '')
       if text[0] == 'd'
         # we are receiving a packet
-        text = q.qname.gsub(/\.#{$domain}$/, '')
         text = text[0..-1]
         pack = dns_decode(text)
         tun.syswrite(pack)

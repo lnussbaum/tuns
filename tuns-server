@@ -243,6 +243,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
 
           next
         else
+          puts "New download request received: #{num} (from #{sender[2]} - #{sender[3]})"
           $dnums[num] = true
         end
         $qmutex.synchronize do

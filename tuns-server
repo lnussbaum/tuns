@@ -235,6 +235,9 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         rep.header.ancount = 1
       elsif text[0..0] == 'r' and q.qtype == 'CNAME'
         # we are given the chance to send something!
+        num = text.gsub(/^r(\d+)$/, '\1')
+        num = num.to_i
+        puts num
         $qmutex.synchronize do
           $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
           $need_wakeup.signal

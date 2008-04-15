@@ -245,12 +245,16 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       next
     end
     type = resp.answer[0].type
-    text = resp.answer[0].cname
-    if text !~ /\.#{$domain}$/ # FIXME
-      puts "Invalid domain name in reply: #{$domain}"
-      next
+    if type == 'CNAME'
+      text = resp.answer[0].cname
+      if resp.question[0].qname !~ /\.#{$domain}$/ # FIXME
+        puts "Invalid domain name in reply: #{resp.question[0].qname}"
+        next
+      end
+      text.gsub!(/\.#{$domain}$/,'') # FIXME
+    else
+      text = '    ' # case for A records. nil doesn't work.
     end
-    text.gsub!(/\.#{$domain}$/,'') # FIXME
     if text[0..0] == 'l' and type == 'CNAME'
       # it's an ack for data we sent
       if not $quiet
@@ -320,6 +324,7 @@ loop do
   Readline::HISTORY.push(line)
   cmd, args = line.split(' ', 2)
   case cmd
+    when nil:
     when 'help':
       puts <<-EOF
 verbose, quiet  toggle verbose mode

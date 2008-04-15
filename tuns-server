@@ -184,14 +184,23 @@ $th_writedns = Thread::new($socket) do |socket|
         else
           # we can send a data packet
           q, rep, sender_addr, sender_port, age = $reqqueue.shift
+          num = q.question[0].qname.(/^r(\d+)\..*/, '\1').to_i
+          if $dnums[num]
+            # duplicate download request. we resend the previous answer.
+            puts "Duplicate download request received: #{num} (from #{sender_addr})"
+            rep.answer << $dnums[num]
+          end
           text = $queue.shift
-          rep.answer << Net::DNS::RR::new_from_hash(
+          ans = Net::DNS::RR::new_from_hash(
             :name => q.qname,
             :ttl => 0,
             :type => 'CNAME',
             :cls => 'IN',
             :cname => "d#{text}.#{$domain}"
           )
+          # FIXME cache cleanup
+          $dnums[num] = ans
+          rep.answer << ans
         end
       end
     end
@@ -236,27 +245,12 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         rep.header.ancount = 1
       elsif text[0..0] == 'r' and q.qtype == 'CNAME'
         # we are given the chance to send something!
-        num = text.gsub(/^r(\d+)$/, '\1')
-        num = num.to_i
-        if $dnums[num]
-          puts "Duplicate download request received: #{num} (from #{sender[2]} - #{sender[3]})"
-          rep.answer << Net::DNS::RR::new_from_hash(
-            :name => q.qname,
-            :ttl => 0,
-            :type => 'CNAME',
-            :cls => 'IN',
-            :cname => "dduplicate.#{$domain}"
-          )
-        else
-          puts "New download request received: #{num} (from #{sender[2]} - #{sender[3]})"
-          $dnums[num] = true
-          $qmutex.synchronize do
-            $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
-            $need_wakeup.signal
-            $need_send.signal
-          end
-          next
+        $qmutex.synchronize do
+          $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
+          $need_wakeup.signal
+          $need_send.signal
         end
+        next
       elsif text[0..0] == 'c' and q.qtype == 'A'
         # config changes
         text = text[1..-1]

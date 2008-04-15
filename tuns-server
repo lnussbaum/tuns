@@ -240,6 +240,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         num = num.to_i
         if $dnums[num]
           puts "Duplicate download request received: #{num}"
+          next
         else
           $dnums[num] = true
         end
@@ -257,6 +258,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         case conf[0]
         when 'reset':
           $max_sleep = MAX_SLEEP
+          $dnums = {}
           puts "Reset all defaults"
           ok = true
         when 'maxsleep':

@@ -124,6 +124,7 @@ end
 UDPSocket.do_not_reverse_lookup = true
 $socket = UDPSocket.new
 $socket.connect($server, 53)
+sendconf($socket, 'reset')
 $smutex = Mutex::new
 $schedmutex = Mutex::new
 # state variables

@@ -262,7 +262,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
             :ttl => 0,
             :type => 'A',
             :cls => 'IN',
-            :cname => "cok.#{$domain}"
+            :address => "1.2.3.4"
           ) 
         else
           rep.answer << Net::DNS::RR::new_from_hash(
@@ -270,7 +270,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
             :ttl => 0,
             :type => 'A',
             :cls => 'IN',
-            :cname => "cko.#{$domain}"
+            :address => "4.3.2.1"
           ) 
         end
         rep.header.ancount = 1

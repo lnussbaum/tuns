@@ -184,7 +184,7 @@ def sendconf(socket, conf)
     $num_req += 1
     if $debug
       puts "*" * 25 + ' SENDING CONFIG ' + '*' * 25
-      p dnspaquet
+      p dnspacket
     end
     socket.send(dnspacket.data, 0)
   end
@@ -244,17 +244,14 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       end
       next
     end
-    if 'CNAME' != resp.answer[0].type
-      puts "Error type"
-      exit(1)
-    end
+    type = resp.answer[0].type
     text = resp.answer[0].cname
     if text !~ /\.#{$domain}$/ # FIXME
       puts "Invalid domain name in reply: #{$domain}"
       next
     end
     text.gsub!(/\.#{$domain}$/,'') # FIXME
-    if text[0..0] == 'l'
+    if text[0..0] == 'l' and type == 'CNAME'
       # it's an ack for data we sent
       if not $quiet
         print '.'
@@ -265,7 +262,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       sendreqs(socket, length)
       next
 
-    elsif text[0..0] == 'd'
+    elsif text[0..0] == 'd' and type == 'CNAME'
       # it's a data packet 
       $schedmutex.synchronize do
         $onfly -= 1
@@ -305,6 +302,14 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
         pack = dns_decode(text)
         tun.syswrite(pack)
       end
+    else resp.question[0].qname[0..0] == 'c' and resp.question[0].qtype == 'A'
+      if resp.answer[0].address == '1.2.3.4'
+        puts "Config: confirmed."
+      elsif resp.answer[0].address == '4.3.2.1'
+        puts "Config: unrecognized options! Strange."
+      else
+        puts "unrecognized config reply: \n#{resp}"
+      end
     end
   end
 end
@@ -327,11 +332,11 @@ EOF
       $debug = !$debug
       puts "Debug mode #{$debug ? 'on' : 'off'}"
     when 'reset':
-      puts "Resetting configuration"
+      puts "Config: reset to default values"
       sendconf($socket, 'reset')
     when 'maxsleep':
       ms = args.to_i.to_s
-      puts "Config: maxsleep = ms"
+      puts "Config: maxsleep = #{ms}"
       sendconf($socket, "maxsleep.#{ms}")
     else
       puts "Unknown command: #{cmd}. Try \"help\"!"

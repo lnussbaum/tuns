@@ -65,7 +65,7 @@ opts = OptionParser::new do |opts|
     $quiet = true
     $debug = false
   end
-  opts.on("-d", "--debug", "Debug mode") do |d|
+  opts.on("", "--debug", "Debug mode") do |d|
     $debug = true
     $quiet = false
   end

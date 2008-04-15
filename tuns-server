@@ -184,7 +184,7 @@ $th_writedns = Thread::new($socket) do |socket|
         else
           # we can send a data packet
           q, rep, sender_addr, sender_port, age = $reqqueue.shift
-          num = q.question[0].qname.(/^r(\d+)\..*/, '\1').to_i
+          num = q.question[0].qname.gsub(/^r(\d+)\..*/, '\1').to_i
           if $dnums[num]
             # duplicate download request. we resend the previous answer.
             puts "Duplicate download request received: #{num} (from #{sender_addr})"

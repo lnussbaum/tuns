@@ -240,18 +240,23 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         num = num.to_i
         if $dnums[num]
           puts "Duplicate download request received: #{num} (from #{sender[2]} - #{sender[3]})"
-
-          next
+          rep.answer << Net::DNS::RR::new_from_hash(
+            :name => q.qname,
+            :ttl => 0,
+            :type => 'CNAME',
+            :cls => 'IN',
+            :cname => "dduplicate.#{$domain}"
+          )
         else
           puts "New download request received: #{num} (from #{sender[2]} - #{sender[3]})"
           $dnums[num] = true
+          $qmutex.synchronize do
+            $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
+            $need_wakeup.signal
+            $need_send.signal
+          end
+          next
         end
-        $qmutex.synchronize do
-          $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
-          $need_wakeup.signal
-          $need_send.signal
-        end
-        next
       elsif text[0..0] == 'c' and q.qtype == 'A'
         # config changes
         text = text[1..-1]

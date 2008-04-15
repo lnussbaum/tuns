@@ -273,7 +273,9 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       end
       # There's nothing waiting on the remote side
       text = text[1..-1]
-      if text == 'zero'
+      if text == 'duplicate'
+        puts "Answer from duplicate query received."
+      elsif text == 'zero'
         $num_nothing += 1
         if not $quiet
           print "0"

@@ -29,8 +29,7 @@ $bindaddr='0.0.0.0'
 $bindport=53
 $ip="192.168.53.2"
 $rip="192.168.53.1"
-$sdomain=nil
-$rdomain=nil
+$domain=nil
 $mtu=nil
 $debug = false
 
@@ -40,17 +39,11 @@ opts = OptionParser::new do |opts|
   opts.banner = "Usage: #{progname} [options]"
   opts.separator ""
   opts.separator "Mandatory options:"
-  opts.on("-s", "--send-domain DOMAIN", "Domain name to use to send data") do |n|
-    $sdomain = n
+  opts.on("-d", "--domain DOMAIN", "Domain name to use to send/receive data") do |n|
+    $domain = n
   end
-  opts.on("-r", "--receive-domain DOMAIN", "Domain name to use to receive data") do |n|
-    $rdomain = n
-  end
-  opts.separator "   Note that the two previous options should be set to the opposite values"
-  opts.separator "   in the client."
-  opts.separator ""
   opts.separator "Verbosity options:"
-  opts.on("-d", "--debug", "Debug mode") do |d|
+  opts.on("", "--debug", "Debug mode") do |d|
     $debug = true
     $quiet = false
   end
@@ -80,9 +73,8 @@ rescue OptionParser::ParseError => pe
   exit 1
 end
 
-if $sdomain.nil? or $rdomain.nil?
-  puts "ERROR: Domains to send and receive data (--send-domain and --receive-domain)"
-  puts "       must be specified."
+if $domain.nil?
+  puts "ERROR: Domain to send and receive data (--domain) must be specified."
   puts
   puts opts
   exit 1
@@ -175,7 +167,7 @@ $th_writedns = Thread::new($socket) do |socket|
             :ttl => 0,
             :type => 'CNAME',
             :cls => 'IN',
-            :cname => "zero.#{$sdomain}"
+            :cname => "dzero.#{$domain}"
           )
         else
           $need_send.wait($qmutex)
@@ -196,7 +188,7 @@ $th_writedns = Thread::new($socket) do |socket|
             :ttl => 0,
             :type => 'CNAME',
             :cls => 'IN',
-            :cname => "#{text}.#{$sdomain}"
+            :cname => "d#{text}.#{$domain}"
           )
         end
       end
@@ -227,29 +219,34 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
       puts "Invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
       next
     end
-    if q.qname =~ /\.#{$rdomain}$/ # FIXME
-      # we are receiving a packet
-      text = q.qname.gsub(/\.#{$rdomain}$/, '') # FIXME
-      pack = dns_decode(text)
-      tun.syswrite(pack)
-      tun.flush
-      length = $qmutex.synchronize { $queue.length }
-      rep.answer << Net::DNS::RR::new_from_hash(
-        :name => q.qname,
-        :ttl => 0,
-        :type => 'CNAME',
-        :cls => 'IN',
-        :cname => "length#{length}.#{$rdomain}"
-      ) 
-      rep.header.ancount = 1
-    elsif q.qname =~ /\.#{$sdomain}$/ # FIXME
-      # we are given the chance to send something!
-      $qmutex.synchronize do
-        $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
-        $need_wakeup.signal
-        $need_send.signal
+    if q.qname =~ /\.#{$domain}$/
+      if text[0] == 'd'
+        # we are receiving a packet
+        text = q.qname.gsub(/\.#{$domain}$/, '')
+        text = text[0..-1]
+        pack = dns_decode(text)
+        tun.syswrite(pack)
+        tun.flush
+        length = $qmutex.synchronize { $queue.length }
+        rep.answer << Net::DNS::RR::new_from_hash(
+          :name => q.qname,
+          :ttl => 0,
+          :type => 'CNAME',
+          :cls => 'IN',
+          :cname => "l#{length}.#{$domain}"
+        ) 
+        rep.header.ancount = 1
+      elsif text[0] == 'r'
+        # we are given the chance to send something!
+        $qmutex.synchronize do
+          $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
+          $need_wakeup.signal
+          $need_send.signal
+        end
+        next
+      else
+        puts "Correct domain, invalid packet type!"
       end
-      next
     else
       puts "Unknown QNAME! #{q.qname}"
       next

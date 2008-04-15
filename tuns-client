@@ -23,13 +23,14 @@ require 'base32'
 require 'thread'
 require 'dns'
 require 'optparse'
+require 'readline'
 
 ## Possible tags in non-quiet mode
 # S we are sending a data packet
 # R we just received a data packet
 # > we are sending a request for data (polling)
 # T no packet was received. we will send a request for data again.
-# #ANCOUNT# answer packet, but without any anwer, received
+# E answer packet, but without any anwer, received
 # . we received an ack for a data packet we sent
 # + we are sending additional request packets
 # S(delay) we are sleeping, since server has nothing for us
@@ -45,8 +46,7 @@ MAX_NOTHING=60
 $mtu=nil
 $debug=false
 $quiet=false
-$sdomain=nil
-$rdomain=nil
+$domain=nil
 $server =  nil
 $ip = "192.168.53.1"
 $rip = "192.168.53.2"
@@ -57,15 +57,9 @@ opts = OptionParser::new do |opts|
   opts.banner = "Usage: #{progname} [options]"
   opts.separator ""
   opts.separator "Mandatory options:"
-  opts.on("-s", "--send-domain DOMAIN", "Domain name to use to send data") do |n|
-    $sdomain = n
+  opts.on("-d", "--domain DOMAIN", "Domain name to use to send/receive data") do |n|
+    $domain = n
   end
-  opts.on("-r", "--receive-domain DOMAIN", "Domain name to use to receive data") do |n|
-    $rdomain = n
-  end
-  opts.separator "   Note that the two previous options should be set to the opposite values"
-  opts.separator "   in the client."
-  opts.separator ""
   opts.separator "Verbosity options:"
   opts.on("-q", "--quiet", "Quiet mode") do |q|
     $quiet = true
@@ -98,9 +92,8 @@ rescue OptionParser::ParseError => pe
   exit 1
 end
 
-if $sdomain.nil? or $rdomain.nil?
-  puts "ERROR: Domains to send and receive data (--send-domain and --receive-domain)"
-  puts "       must be specified."
+if $domain.nil?
+  puts "ERROR: Domain to send and receive data (--domain) must be specified."
   puts
   puts opts
   exit 1
@@ -146,7 +139,7 @@ th_send = Thread::new($socket, $tun) do |socket, tun|
       exit(1)
     end
     packet = dns_encode(s)
-    dnspacket = Net::DNS::Packet::new_from_values("#{packet}.#{$sdomain}", 'CNAME', 'IN')
+    dnspacket = Net::DNS::Packet::new_from_values("d#{packet}.#{$domain}", 'CNAME', 'IN')
     $smutex.synchronize do
       if $debug
         puts "*" * 25 + ' SENDING DATA ' + '*' * 25
@@ -166,10 +159,10 @@ end
 # function to send a request for data
 def sendreq(socket)
   $smutex.synchronize do
-    dnspacket = Net::DNS::Packet::new_from_values("d#{$num_req}.#{$rdomain}", 'CNAME', 'IN')
+    dnspacket = Net::DNS::Packet::new_from_values("r#{$num_req}.#{$domain}", 'CNAME', 'IN')
     $num_req += 1
     if $debug
-      puts "*" * 25 + ' SENDING REQ ' + '*' * 25
+      puts "*" * 25 + ' SENDING REQ FOR DATA ' + '*' * 25
     end
     if not $quiet
       print '>'
@@ -179,6 +172,19 @@ def sendreq(socket)
     $schedmutex.synchronize do
       $onfly += 1
     end
+  end
+end
+
+# function to send a config change
+def sendconf(socket, conf)
+  $smutex.synchronize do
+    dnspacket = Net::DNS::Packet::new_from_values("c#{conf}.#{$domain}", 'CNAME', 'IN')
+    $num_req += 1
+    if $debug
+      puts "*" * 25 + ' SENDING CONFIG ' + '*' * 25
+      p dnspaquet
+    end
+    socket.send(dnspacket.data, 0)
   end
 end
 
@@ -230,7 +236,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
     end
     if resp.header.ancount != 1
       if not $quiet
-        print "#ANCOUNT#"
+        print "E"
         STDOUT.flush
         sendreq(socket)
       end
@@ -241,23 +247,29 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       exit(1)
     end
     text = resp.answer[0].cname
-    if text =~ /\.#{$sdomain}$/ # FIXME
+    if text !~ /\.#{$domain}$/ # FIXME
+      puts "Invalid domain name in reply: #{$domain}"
+      next
+    end
+    text.gsub!(/\.#{$domain}$/,'') # FIXME
+    if text[0] == 'l'
       # it's an ack for data we sent
       if not $quiet
         print '.'
         STDOUT.flush
       end
-      length = text.gsub(/^length(\d+)\..*$/, '\1').to_i
+      # FIXME not safe
+      length = text.gsub(/^l(\d+)$/, '\1').to_i
       sendreqs(socket, length)
       next
 
-    elsif text =~ /\.#{$rdomain}$/ # FIXME
+    elsif text[0] == 'd'
       # it's a data packet 
-      text.gsub!(/\.#{$rdomain}$/,'') # FIXME
       $schedmutex.synchronize do
         $onfly -= 1
       end
       # There's nothing waiting on the remote side
+      text = text[1..-1]
       if text == 'zero'
         $num_nothing += 1
         if not $quiet
@@ -291,10 +303,32 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
         pack = dns_decode(text)
         tun.syswrite(pack)
       end
-    else
-      puts "response unknown: #{text}"
-      next
     end
+  end
+end
+
+puts "TUNS started. type \"help\" for inline help."
+loop do
+  line = Readline::readline('[tuns] ')
+  Readline::HISTORY.push(line)
+  cmd, args = line.split(' ', 2)
+  case cmd
+    when 'help':
+      puts <<-EOF
+verbose, quiet  toggle verbose mode
+debug           toggle debug mode
+EOF
+    when 'verbose', 'quiet':
+      $quiet = !$quiet
+      puts "Verbose mode #{$quiet ? 'off' : 'on'}"
+    when 'debug':
+      $debug = !$debug
+      puts "Debug mode #{$debug ? 'on' : 'off'}"
+    when 'reset':
+      puts "Resetting configuration"
+      sendconf($socket, 'reset')
+    else
+      puts "Unknown command: #{cmd}. Try \"help\"!"
   end
 end
 

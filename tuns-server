@@ -239,7 +239,8 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         num = text.gsub(/^r(\d+)$/, '\1')
         num = num.to_i
         if $dnums[num]
-          puts "Duplicate download request received: #{num}"
+          puts "Duplicate download request received: #{num} (from #{sender[2]} - #{sender[3]})"
+
           next
         else
           $dnums[num] = true

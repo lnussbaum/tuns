@@ -124,7 +124,6 @@ end
 UDPSocket.do_not_reverse_lookup = true
 $socket = UDPSocket.new
 $socket.connect($server, 53)
-sendconf($socket, 'reset')
 $smutex = Mutex::new
 $schedmutex = Mutex::new
 # state variables
@@ -320,6 +319,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
 end
 
 puts "TUNS started. type \"help\" for inline help."
+sendconf($socket, 'reset')
 loop do
   line = Readline::readline('[tuns] ')
   Readline::HISTORY.push(line)

@@ -189,18 +189,19 @@ $th_writedns = Thread::new($socket) do |socket|
             # duplicate download request. we resend the previous answer.
             puts "Duplicate download request received: #{num} (from #{sender_addr})"
             rep.answer << $dnums[num]
+          else
+            text = $queue.shift
+            ans = Net::DNS::RR::new_from_hash(
+              :name => q.qname,
+              :ttl => 0,
+              :type => 'CNAME',
+              :cls => 'IN',
+              :cname => "d#{text}.#{$domain}"
+            )
+            # FIXME cache cleanup
+            $dnums[num] = ans
+            rep.answer << ans
           end
-          text = $queue.shift
-          ans = Net::DNS::RR::new_from_hash(
-            :name => q.qname,
-            :ttl => 0,
-            :type => 'CNAME',
-            :cls => 'IN',
-            :cname => "d#{text}.#{$domain}"
-          )
-          # FIXME cache cleanup
-          $dnums[num] = ans
-          rep.answer << ans
         end
       end
     end
@@ -302,4 +303,3 @@ end
 # wait for all threads to finish
 $th_readtun.join
 $th_readdns.join
-

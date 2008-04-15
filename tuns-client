@@ -35,11 +35,9 @@ require 'readline'
 # + we are sending additional request packets
 # S(delay) we are sleeping, since server has nothing for us
 
-RECV_TIMEOUT = 1.0
+RECV_TIMEOUT = 1.5
 DELAY_INCR = 0.1
 DELAY_MAX = 2 # max delay before polls
-MIN_ONFLY=6
-MAX_ONFLY=50 # max number of reqs on the fly
 PKTSIZE=2000
 MAX_NOTHING=60
 
@@ -127,7 +125,6 @@ $socket.connect($server, 53)
 $smutex = Mutex::new
 $schedmutex = Mutex::new
 # state variables
-$onfly = 0 # number of packets currently on the fly
 $num_nothing = 0 # number of successive reqs with nothing in remote queue
 $num_req = 0 # number of requests. used to generate diff queries each time
 
@@ -170,9 +167,6 @@ def sendreq(socket)
       STDOUT.flush
     end
     socket.send(dnspacket.data, 0)
-    $schedmutex.synchronize do
-      $onfly += 1
-    end
   end
 end
 
@@ -194,15 +188,15 @@ def sendreqs(socket, length, zero = false)
   diff = nil
   $schedmutex.synchronize do
     if zero
-      diff = [ length, 1 ].min - $onfly
+      diff = length - 1
     else
-      diff = [ length, MAX_ONFLY ].min - $onfly
+      diff = length
     end
   end
   (1..diff).each do
     # send reqs for additional packets
     if not $quiet and diff > 1
-      print "+(#{$onfly})"
+      print "+"
       STDOUT.flush
     end
     sendreq(socket)
@@ -223,10 +217,6 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       if not $quiet
         print 'T'
         STDOUT.flush
-      end
-      # The packet was lost, so we decrease $onfly
-      $schedmutex.synchronize do
-        $onfly -= 1
       end
       sendreq(socket)
       next
@@ -267,15 +257,9 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       next
 
     elsif text[0..0] == 'd' and type == 'CNAME'
-      # it's a data packet 
-      $schedmutex.synchronize do
-        $onfly -= 1
-      end
       # There's nothing waiting on the remote side
       text = text[1..-1]
-      if text == 'duplicate'
-        puts "Answer from duplicate query received."
-      elsif text == 'zero'
+      if text == 'zero'
         $num_nothing += 1
         if not $quiet
           print "0"
@@ -297,9 +281,9 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           end
           sleep delay
         end
-        sendreqs(socket, MIN_ONFLY, $num_nothing > MAX_NOTHING)
+        sendreqs(socket, 1, $num_nothing > MAX_NOTHING)
       else
-        sendreqs(socket, MIN_ONFLY)
+        sendreqs(socket, 1)
         $num_nothing = 0
         if not $quiet
           print 'R'

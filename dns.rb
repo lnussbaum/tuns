@@ -20,9 +20,11 @@ require 'base32'
 
 def dns_split(unsplit)
   split = ""
-  while unsplit.length > 63
-    split = split + unsplit[0...63] + '.'
-    unsplit = unsplit[63..-1]
+  max = 62
+  while unsplit.length > max
+    split = split + unsplit[0...max] + '.'
+    unsplit = unsplit[max..-1]
+    max = 63 # only the first word has to be 62 chars
   end
   if unsplit.length == 0
     text = split[0..-2]

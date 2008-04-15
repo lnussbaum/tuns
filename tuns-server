@@ -216,13 +216,9 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
       p dnsp
     end
     rep = build_reply(dnsp)
-    if q.qtype != 'CNAME'
-      puts "Invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
-      next
-    end
     if q.qname =~ /\.#{$domain}$/
       text = q.qname.gsub(/\.#{$domain}$/, '')
-      if text[0..0] == 'd'
+      if text[0..0] == 'd' and q.qtype == 'CNAME'
         # we are receiving a packet
         text = text[1..-1]
         pack = dns_decode(text)
@@ -237,7 +233,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
           :cname => "l#{length}.#{$domain}"
         ) 
         rep.header.ancount = 1
-      elsif text[0..0] == 'r'
+      elsif text[0..0] == 'r' and q.qtype == 'CNAME'
         # we are given the chance to send something!
         $qmutex.synchronize do
           $reqqueue.push([q, rep, sender[3], sender[1], Time::now])
@@ -245,7 +241,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
           $need_send.signal
         end
         next
-      elsif text[0..0] == 'c'
+      elsif text[0..0] == 'c' and q.qtype == 'A'
         # config changes
         text = [1..-1]
         conf = text.split('.')
@@ -279,10 +275,10 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         end
         rep.header.ancount = 1
       else
-        puts "Correct domain, invalid packet type!"
+        puts "Correct domain, invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
       end
     else
-      puts "Unknown QNAME! #{q.qname}"
+      puts "Invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
       next
     end
     if $debug

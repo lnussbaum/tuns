@@ -252,7 +252,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       next
     end
     text.gsub!(/\.#{$domain}$/,'') # FIXME
-    if text[0] == 'l'
+    if text[0..0] == 'l'
       # it's an ack for data we sent
       if not $quiet
         print '.'
@@ -263,7 +263,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       sendreqs(socket, length)
       next
 
-    elsif text[0] == 'd'
+    elsif text[0..0] == 'd'
       # it's a data packet 
       $schedmutex.synchronize do
         $onfly -= 1

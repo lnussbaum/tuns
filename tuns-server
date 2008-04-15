@@ -221,7 +221,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
     end
     if q.qname =~ /\.#{$domain}$/
       text = q.qname.gsub(/\.#{$domain}$/, '')
-      if text[0] == 'd'
+      if text[0..0] == 'd'
         # we are receiving a packet
         text = text[0..-1]
         pack = dns_decode(text)
@@ -236,7 +236,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
           :cname => "l#{length}.#{$domain}"
         ) 
         rep.header.ancount = 1
-      elsif text[0] == 'r'
+      elsif text[0..0] == 'r'
         # we are given the chance to send something!
         $qmutex.synchronize do
           $reqqueue.push([q, rep, sender[3], sender[1], Time::now])

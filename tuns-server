@@ -243,7 +243,7 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         next
       elsif text[0..0] == 'c' and q.qtype == 'A'
         # config changes
-        text = [1..-1]
+        text = text[1..-1]
         conf = text.split('.')
         ok = false
         case conf[0]

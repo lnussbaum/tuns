@@ -50,6 +50,7 @@ $domain=nil
 $server =  nil
 $ip = "192.168.53.1"
 $rip = "192.168.53.2"
+$timeout = RECV_TIMEOUT
 
 progname = File::basename($PROGRAM_NAME)
 opts = OptionParser::new do |opts|
@@ -178,7 +179,8 @@ end
 # function to send a config change
 def sendconf(socket, conf)
   $smutex.synchronize do
-    dnspacket = Net::DNS::Packet::new_from_values("c#{conf}.#{$domain}", 'CNAME', 'IN')
+    # FIXME add random number, maybe?
+    dnspacket = Net::DNS::Packet::new_from_values("c#{conf}.#{$domain}", 'A', 'IN')
     $num_req += 1
     if $debug
       puts "*" * 25 + ' SENDING CONFIG ' + '*' * 25
@@ -214,7 +216,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
   while true
     ans, from = nil
     begin
-      Timeout::timeout(RECV_TIMEOUT) do
+      Timeout::timeout($timeout) do
         ans, from = socket.recvfrom(PKTSIZE)
       end
     rescue Timeout::Error
@@ -327,6 +329,10 @@ EOF
     when 'reset':
       puts "Resetting configuration"
       sendconf($socket, 'reset')
+    when 'maxsleep':
+      ms = args.to_i.to_s
+      puts "Config: maxsleep = ms"
+      sendconf($socket, "maxsleep.#{ms}")
     else
       puts "Unknown command: #{cmd}. Try \"help\"!"
   end

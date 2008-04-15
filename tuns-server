@@ -24,7 +24,8 @@ require 'dns'
 require 'optparse'
 
 PKTSIZE=2000
-$max_sleep=2.0
+MAX_SLEEP=1.0
+$max_sleep=MAX_SLEEP
 $bindaddr='0.0.0.0'
 $bindport=53
 $ip="192.168.53.2"
@@ -244,6 +245,39 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
           $need_send.signal
         end
         next
+      elsif text[0..0] == 'c'
+        # config changes
+        text = [1..-1]
+        conf = text.split('.')
+        ok = false
+        case conf[0]
+        when 'reset':
+          $max_sleep = MAX_SLEEP
+          puts "Reset all defaults"
+          ok = true
+        when 'maxsleep':
+          $max_sleep = conf[1].to_f / 1000
+          puts "Set $max_sleep to #{$max_sleep}"
+          ok = true
+        end
+        if ok
+          rep.answer << Net::DNS::RR::new_from_hash(
+            :name => q.qname,
+            :ttl => 0,
+            :type => 'A',
+            :cls => 'IN',
+            :cname => "cok.#{$domain}"
+          ) 
+        else
+          rep.answer << Net::DNS::RR::new_from_hash(
+            :name => q.qname,
+            :ttl => 0,
+            :type => 'A',
+            :cls => 'IN',
+            :cname => "cko.#{$domain}"
+          ) 
+        end
+        rep.header.ancount = 1
       else
         puts "Correct domain, invalid packet type!"
       end

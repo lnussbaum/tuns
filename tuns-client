@@ -23,7 +23,6 @@ require 'base32'
 require 'thread'
 require 'dns'
 require 'optparse'
-require 'readline'
 
 ## Possible tags in non-quiet mode
 # S we are sending a data packet
@@ -155,7 +154,7 @@ def received_packet(resp)
       return
     end
     n, t = d
-    puts "RTT: [#{n}] #{Time::now - t}s (#{qname})"
+    puts "RTT: [#{n}] #{Time::now - t}s (#{qname[0..40]}) (not received: #{$sentpackets.length - 1})"
     $sentpackets.delete(qname)
   end
 end
@@ -243,7 +242,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
     end
     recvtime = Time::now
     resp = Net::DNS::Packet.new_from_binary(ans)
-    received_packet(resp) if $rtt # handle $rtt
+    received_packet(resp) if $rtt
     if $debug
       puts "*" * 25 + ' RECEIVED ' + '*' * 25
       p resp
@@ -333,8 +332,9 @@ end
 puts "TUNS started. type \"help\" for inline help."
 sendconf($socket, 'reset')
 loop do
-  line = Readline::readline('[tuns] ')
-  Readline::HISTORY.push(line)
+  print '[tuns] '
+  line = gets.chomp
+  next if line == ""
   cmd, args = line.split(' ', 2)
   case cmd
     when nil then

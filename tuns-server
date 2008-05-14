@@ -24,7 +24,7 @@ require 'dns'
 require 'optparse'
 
 PKTSIZE=2000
-MAX_SLEEP=1.0
+MAX_SLEEP=1.5
 $max_sleep=MAX_SLEEP
 $bindaddr='0.0.0.0'
 $bindport=53
@@ -93,6 +93,7 @@ system("ifconfig #{dev} #{$ip} mtu #{$mtu} up")
 system("route add -host #{$rip} dev #{dev}")
 
 # creates and configure listening socket
+UDPSocket.do_not_reverse_lookup = true
 $socket = UDPSocket.new
 $socket.bind($bindaddr, $bindport) 
 
@@ -143,7 +144,6 @@ $th_sleep = Thread::new do
       # if there's no reply waiting, no need to wake me up.
       if $reqqueue.length == 0
         $need_wakeup.wait($qmutex)
-        sleep $max_sleep
       end
       $need_send.signal
     end
@@ -158,10 +158,15 @@ $th_writedns = Thread::new($socket) do |socket|
     sender_addr = nil
     sender_port = nil
     $qmutex.synchronize do
+      puts "<---"
+      $reqqueue.each do |e|
+        puts "#{e[0].qname} #{e[2]} #{e[3]} #{e[4]}"
+      end
+      puts "--->"
       if $queue.length == 0
         if $reqqueue.length == 0
           $need_send.wait($qmutex)
-        elsif $reqqueue.length > 1 and (Time::now - $reqqueue[0][4]) > $max_sleep
+        elsif (Time::now - $reqqueue[0][4]) > $max_sleep
           # we need to send a zero packet
           q, rep, sender_addr, sender_port, age = $reqqueue.shift
           rep.answer << Net::DNS::RR::new_from_hash(
@@ -179,7 +184,6 @@ $th_writedns = Thread::new($socket) do |socket|
         if $reqqueue.length == 0
           # we have to wait for a req packet
           puts "Something to send, but no req!"
-          STDOUT.flush
           $need_send.wait($qmutex)
         else
           # we can send a data packet
@@ -258,12 +262,12 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         conf = text.split('.')
         ok = false
         case conf[0]
-        when 'reset':
+        when 'reset' then
           $max_sleep = MAX_SLEEP
           $dnums = {}
           puts "Reset all defaults"
           ok = true
-        when 'maxsleep':
+        when 'maxsleep' then
           $max_sleep = conf[1].to_f / 1000
           puts "Set $max_sleep to #{$max_sleep}"
           ok = true

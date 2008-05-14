@@ -49,6 +49,7 @@ $server =  nil
 $ip = "192.168.53.1"
 $rip = "192.168.53.2"
 $timeout = RECV_TIMEOUT
+$rtt = false
 
 progname = File::basename($PROGRAM_NAME)
 opts = OptionParser::new do |opts|
@@ -122,11 +123,42 @@ end
 UDPSocket.do_not_reverse_lookup = true
 $socket = UDPSocket.new
 $socket.connect($server, 53)
-$smutex = Mutex::new
 $schedmutex = Mutex::new
 # state variables
 $num_nothing = 0 # number of successive reqs with nothing in remote queue
 $num_req = 0 # number of requests. used to generate diff queries each time
+
+$sentpacketsmutex = Mutex::new
+$sentpackets = {}
+$numpacket = 0
+$sendmutex = Mutex::new # mutex to hold to write to socket
+# function to send data to the DNS socket
+def socketsend(socket, data, text)
+  $sendmutex.synchronize do
+    socket.send(data, 0)
+  end
+  if $rtt
+    $sentpacketsmutex.synchronize do
+      $sentpackets[text] = [$numpacket, Time::now]
+      $numpacket += 1
+    end
+  end
+end
+
+def received_packet(resp)
+  return if not $rtt
+  $sentpacketsmutex.synchronize do
+    qname = resp.question[0].qname
+    d = $sentpackets[qname]
+    if d.nil?
+      puts "RTT: recv #{qname} without corresponding query!"
+      return
+    end
+    n, t = d
+    puts "RTT: [#{n}] #{Time::now - t}s (#{qname})"
+    $sentpackets.delete(qname)
+  end
+end
 
 # Thread that reads from tun and sends to DNS
 th_send = Thread::new($socket, $tun) do |socket, tun|
@@ -137,65 +169,53 @@ th_send = Thread::new($socket, $tun) do |socket, tun|
       exit(1)
     end
     packet = dns_encode(s)
-    dnspacket = Net::DNS::Packet::new_from_values("d#{packet}.#{$domain}", 'CNAME', 'IN')
-    $smutex.synchronize do
-      if $debug
-        puts "*" * 25 + ' SENDING DATA ' + '*' * 25
-        p dnspacket
-      end
-      if not $quiet
-        print 'S'
-        STDOUT.flush
-      end
-      socket.send(dnspacket.data, 0)
-      $num_nothing = 0
+    text = "d#{packet}.#{$domain}"
+    dnspacket = Net::DNS::Packet::new_from_values(text, 'CNAME', 'IN')
+    if $debug
+      puts "*" * 25 + ' SENDING DATA ' + '*' * 25
+      p dnspacket
     end
+    if not $quiet
+      print 'S'
+      STDOUT.flush
+    end
+    socketsend(socket, dnspacket.data, text)
+    $num_nothing = 0
     sendreq(socket)
   end
 end
 
 # function to send a request for data
 def sendreq(socket)
-  $smutex.synchronize do
-    dnspacket = Net::DNS::Packet::new_from_values("r#{$num_req}.#{$domain}", 'CNAME', 'IN')
-    $num_req += 1
-    if $debug
-      puts "*" * 25 + ' SENDING REQ FOR DATA ' + '*' * 25
-    end
-    if not $quiet
-      print '>'
-      STDOUT.flush
-    end
-    socket.send(dnspacket.data, 0)
+  text = "r#{$num_req}.#{$domain}"
+  dnspacket = Net::DNS::Packet::new_from_values(text, 'CNAME', 'IN')
+  $num_req += 1
+  if $debug
+    puts "*" * 25 + " SENDING REQ FOR DATA (#{$num_req}) " + '*' * 25
   end
+  if not $quiet
+    print '>'
+    STDOUT.flush
+  end
+  socketsend(socket, dnspacket.data, text)
 end
 
 # function to send a config change
 def sendconf(socket, conf)
-  $smutex.synchronize do
-    # FIXME add random number, maybe?
-    dnspacket = Net::DNS::Packet::new_from_values("c#{conf}.#{$domain}", 'A', 'IN')
-    $num_req += 1
-    if $debug
-      puts "*" * 25 + ' SENDING CONFIG ' + '*' * 25
-      p dnspacket
-    end
-    socket.send(dnspacket.data, 0)
+  # FIXME add random number, maybe?
+  text = "c#{conf}.#{$domain}"
+  dnspacket = Net::DNS::Packet::new_from_values(text, 'A', 'IN')
+  if $debug
+    puts "*" * 25 + ' SENDING CONFIG ' + '*' * 25
+    p dnspacket
   end
+  socketsend(socket, dnspacket.data, text)
 end
 
 def sendreqs(socket, length, zero = false)
-  diff = nil
-  $schedmutex.synchronize do
-    if zero
-      diff = length - 1
-    else
-      diff = length
-    end
-  end
-  (1..diff).each do
+  (1..length).each do
     # send reqs for additional packets
-    if not $quiet and diff > 1
+    if not $quiet and length > 1
       print "+"
       STDOUT.flush
     end
@@ -203,7 +223,7 @@ def sendreqs(socket, length, zero = false)
   end
 end
 
-# thread that reads on DNS and writes to tun
+# thread that reads from DNS and writes to tun
 th_recv = Thread::new($socket, $tun) do |socket, tun|
   Thread::current.abort_on_exception = true
   sendreq(socket)
@@ -221,7 +241,9 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       sendreq(socket)
       next
     end
+    recvtime = Time::now
     resp = Net::DNS::Packet.new_from_binary(ans)
+    received_packet(resp) if $rtt # handle $rtt
     if $debug
       puts "*" * 25 + ' RECEIVED ' + '*' * 25
       p resp
@@ -255,10 +277,9 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
       length = text.gsub(/^l(\d+)$/, '\1').to_i
       sendreqs(socket, length)
       next
-
     elsif text[0..0] == 'd' and type == 'CNAME'
-      # There's nothing waiting on the remote side
       text = text[1..-1]
+      # There's nothing waiting on the remote side
       if text == 'zero'
         $num_nothing += 1
         if not $quiet
@@ -281,9 +302,12 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           end
           sleep delay
         end
-        sendreqs(socket, 1, $num_nothing > MAX_NOTHING)
+
+        num_req = resp.question[0].qname.gsub(/^r(\d+)\..*/, '\1').to_i
+        if num_req == $num_req # only resend if we received the last ack
+          sendreqs(socket, 1)
+        end
       else
-        sendreqs(socket, 1)
         $num_nothing = 0
         if not $quiet
           print 'R'
@@ -291,6 +315,8 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
         end
         pack = dns_decode(text)
         tun.syswrite(pack)
+        # send request for next packet.
+        sendreqs(socket, 1)
       end
     else resp.question[0].qname[0..0] == 'c' and resp.question[0].qtype == 'A'
       if resp.answer[0].address == '1.2.3.4'
@@ -311,22 +337,23 @@ loop do
   Readline::HISTORY.push(line)
   cmd, args = line.split(' ', 2)
   case cmd
-    when nil:
-    when 'help':
+    when nil then
+    when 'help' then
       puts <<-EOF
 verbose, quiet  toggle verbose mode
 debug           toggle debug mode
+maxsleep 2000   set max sleep time on server side (delay in ms)
 EOF
-    when 'verbose', 'quiet':
+    when 'verbose', 'quiet' then
       $quiet = !$quiet
       puts "Verbose mode #{$quiet ? 'off' : 'on'}"
-    when 'debug':
+    when 'debug' then
       $debug = !$debug
       puts "Debug mode #{$debug ? 'on' : 'off'}"
-    when 'reset':
+    when 'reset' then
       puts "Config: reset to default values"
       sendconf($socket, 'reset')
-    when 'maxsleep':
+    when 'maxsleep' then
       ms = args.to_i.to_s
       puts "Config: maxsleep = #{ms}"
       sendconf($socket, "maxsleep.#{ms}")

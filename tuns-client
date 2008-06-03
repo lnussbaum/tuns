@@ -34,7 +34,7 @@ require 'optparse'
 # + we are sending additional request packets
 # S(delay) we are sleeping, since server has nothing for us
 
-RECV_TIMEOUT = 1.5
+RECV_TIMEOUT = 2.5
 DELAY_INCR = 0.1
 DELAY_MAX = 2 # max delay before polls
 PKTSIZE=2000
@@ -186,9 +186,9 @@ end
 
 # function to send a request for data
 def sendreq(socket)
+  $num_req += 1
   text = "r#{$num_req}.#{$domain}"
   dnspacket = Net::DNS::Packet::new_from_values(text, 'CNAME', 'IN')
-  $num_req += 1
   if $debug
     puts "*" * 25 + " SENDING REQ FOR DATA (#{$num_req}) " + '*' * 25
   end
@@ -286,10 +286,10 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           STDOUT.flush
         end
         # sleep if needed
-        if $num_nothing > MAX_NOTHING * 2
+        if $num_nothing > MAX_NOTHING * 2 and num_req == $num_req
           delay = ($num_nothing - (MAX_NOTHING*2)) * DELAY_INCR
           delay = DELAY_MAX if delay > DELAY_MAX
-        elsif $num_nothing > MAX_NOTHING
+        elsif $num_nothing > MAX_NOTHING and num_req == $num_req
           delay = 0.1
         else
           delay = 0

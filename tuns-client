@@ -42,7 +42,7 @@ MAX_NOTHING=60
 
 $mtu=nil
 $debug=false
-$quiet=false
+$quiet=true
 $domain=nil
 $server =  nil
 $ip = "192.168.53.1"
@@ -340,13 +340,19 @@ loop do
     when nil then
     when 'help' then
       puts <<-EOF
+
 verbose, quiet  toggle verbose mode
 debug           toggle debug mode
 maxsleep 2000   set max sleep time on server side (delay in ms)
+rtt              display packets round trip time
+
 EOF
     when 'verbose', 'quiet' then
       $quiet = !$quiet
       puts "Verbose mode #{$quiet ? 'off' : 'on'}"
+    when 'rtt' then
+      $rtt = !$rtt
+      puts "RTT mode #{$rtt ? 'on' : 'off'}"
     when 'debug' then
       $debug = !$debug
       puts "Debug mode #{$debug ? 'on' : 'off'}"

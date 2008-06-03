@@ -22,6 +22,7 @@ require 'Net/DNS'
 require 'thread'
 require 'dns'
 require 'optparse'
+require 'date'
 
 PKTSIZE=2000
 MAX_SLEEP=1.5
@@ -109,7 +110,7 @@ $th_readtun = Thread::new($socket, $tun) do |socket, tun|
   Thread::current.abort_on_exception = true
   while (s = tun.sysread(PKTSIZE))
     if s.length > $mtu
-      puts "Packet too long (#{s.length}) !!"
+      puts "#{DateTime::now.to_s} Packet too long (#{s.length}) !!"
       exit(1)
     end
     packet = dns_encode(s)
@@ -158,11 +159,11 @@ $th_writedns = Thread::new($socket) do |socket|
     sender_addr = nil
     sender_port = nil
     $qmutex.synchronize do
-      puts "<---"
-      $reqqueue.each do |e|
-        puts "#{e[0].qname} #{e[2]} #{e[3]} #{e[4]}"
-      end
-      puts "--->"
+#      puts "<---"
+#      $reqqueue.each do |e|
+#        puts "#{e[0].qname} #{e[2]} #{e[3]} #{e[4]}"
+#      end
+#      puts "--->"
       if $queue.length == 0
         if $reqqueue.length == 0
           $need_send.wait($qmutex)
@@ -183,7 +184,7 @@ $th_writedns = Thread::new($socket) do |socket|
         # something to send
         if $reqqueue.length == 0
           # we have to wait for a req packet
-          puts "Something to send, but no req!"
+          puts "#{DateTime::now.to_s} Something to send, but no req!"
           $need_send.wait($qmutex)
         else
           # we can send a data packet
@@ -191,7 +192,7 @@ $th_writedns = Thread::new($socket) do |socket|
           num = q.qname.gsub(/^r(\d+)\..*/, '\1').to_i
           if $dnums[num]
             # duplicate download request. we resend the previous answer.
-            puts "Duplicate download request received: #{num} (from #{sender_addr})"
+            puts "#{DateTime::now.to_s} Duplicate download request received: #{num} (from #{sender_addr})"
             rep.answer << $dnums[num]
           else
             text = $queue.shift
@@ -291,10 +292,10 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
         end
         rep.header.ancount = 1
       else
-        puts "Correct domain, invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
+        puts "#{DateTime::now.to_s} Correct domain, invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
       end
     else
-      puts "Invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
+      puts "#{DateTime::now.to_s} Invalid packet type: #{q.qtype} #{q.qname} (from #{sender[2]} - #{sender[3]})"
       next
     end
     if $debug

@@ -103,9 +103,13 @@ if $mtu.nil?
   $mtu = 140 # FIXME
 end
 $tun = File::new('/dev/net/tun', File::RDWR)
-dev = tun_allocate($tun)
-system("ifconfig #{dev} #{$ip} mtu #{$mtu} up")
-system("route add -host #{$rip} dev #{dev}")
+$dev = tun_allocate($tun)
+
+def reset_interface
+  system("ifconfig #{$dev} #{$ip} mtu #{$mtu} up")
+end
+reset_interface
+system("route add -host #{$rip} dev #{$dev}")
 system("sysctl -w net.ipv4.tcp_frto=1") # better for lossy links
 
 # creates and configure socket to server
@@ -344,7 +348,8 @@ loop do
 verbose, quiet  toggle verbose mode
 debug           toggle debug mode
 maxsleep 2000   set max sleep time on server side (delay in ms)
-rtt              display packets round trip time
+mtu 200         set the interface's MTU
+rtt             display packets round trip time (nonsense if maxsleep > 0)
 
 EOF
     when 'verbose', 'quiet' then
@@ -363,6 +368,11 @@ EOF
       ms = args.to_i.to_s
       puts "Config: maxsleep = #{ms}"
       sendconf($socket, "maxsleep.#{ms}")
+    when 'mtu' then
+      $mtu = args.to_i
+      puts "Config: mtu = #{$mtu}"
+      sendconf($socket, "mtu.#{$mtu}")
+      reset_interface
     else
       puts "Unknown command: #{cmd}. Try \"help\"!"
   end

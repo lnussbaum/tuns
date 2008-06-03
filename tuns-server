@@ -89,9 +89,14 @@ if $mtu.nil?
   $mtu = 140 # FIXME
 end
 $tun = File::new('/dev/net/tun', File::RDWR)
-dev = tun_allocate($tun)
-system("ifconfig #{dev} #{$ip} mtu #{$mtu} up")
-system("route add -host #{$rip} dev #{dev}")
+$dev = tun_allocate($tun)
+
+def reset_interface
+  system("ifconfig #{$dev} #{$ip} mtu #{$mtu} up")
+end
+
+reset_interface
+system("route add -host #{$rip} dev #{$dev}")
 
 # creates and configure listening socket
 UDPSocket.do_not_reverse_lookup = true
@@ -272,6 +277,11 @@ $th_readdns = Thread::new($socket, $tun) do |socket, tun|
           $max_sleep = conf[1].to_f / 1000
           puts "Set $max_sleep to #{$max_sleep}"
           ok = true
+        when 'mtu' then
+          $mtu = conf[1].to_i
+          puts "Set $mtu to #{$mtu}"
+          ok = true
+          reset_interface
         end
         if ok
           rep.answer << Net::DNS::RR::new_from_hash(

@@ -1,6 +1,7 @@
 TUNS X.X.X (XX/XX/XXXX)
 -----------------------
-* Prepared for next release.
+* On client-side, added a readline-like console to change params on the fly.
+* Several optimizations.
 
 TUNS 0.9.1 (06/02/2008)
 -----------------------

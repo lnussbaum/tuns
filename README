@@ -34,19 +34,16 @@ There is no real installation script.
 
 Usage
 -----
-You need to delegate two DNS zones (using NS records) to the system where TUNS
-will run. One of them will be used to send packets, and the other one will be
-used to receive packets. In the following example, we use up.tuns.net and
-do.tuns.net.
+You need to delegate a DNS zone (using NS records) to the system where TUNS
+will run. In the following example, we use dnstunnel.tuns.net.
 
-Client: as root, run tuns-client -s up.tuns.net -r do.tuns.net
-Server: as root, run tuns-server -s do.tuns.net -r up.tuns.net
-
-By default, the client runs in verbose mode. Use the -q option to run in
-quiet mode.
+Client: as root, run tuns-client -d dnstunnel.tuns.net
+Server: as root, run tuns-server -d dnstunnel.tuns.net
 
 There's a number of possible options you can use to change default values.
-See tuns-client -h and tuns-server -h
+See tuns-client -h and tuns-server -h.
+
+After starting the client, type 'help' to get the online help.
 
 Troubleshooting
 ---------------
@@ -59,4 +56,5 @@ The base32 module is licensed under a permissive non-copylefted free software
 license (see http://base32.rubyforge.org/svn/trunk/COPYING -- the COPYING file
 wasn't included in the base32 tarball).
 
-TUNS is licensed under GPL v3, or any later version. See the COPYING file.
+TUNS is licensed under GPL version 3, or any later version. See the COPYING
+file.

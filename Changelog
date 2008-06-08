@@ -1,7 +1,8 @@
-TUNS X.X.X (XX/XX/XXXX)
+TUNS 0.9.2 (08/06/2008)
 -----------------------
 * On client-side, added a readline-like console to change params on the fly.
 * Several optimizations.
+* Uses a single domain name, making it easier to switch from another app.
 
 TUNS 0.9.1 (06/02/2008)
 -----------------------

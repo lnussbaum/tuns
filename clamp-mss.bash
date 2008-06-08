@@ -1,4 +1,4 @@
 #!/bin/bash
-# Example script to limit the MSS to the interface's MTU.
+# Limits the MSS to the interface's MTU.
 
-sudo iptables -I OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+iptables -I OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu

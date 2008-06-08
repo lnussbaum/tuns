@@ -290,6 +290,7 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           STDOUT.flush
         end
         # sleep if needed
+        num_req = resp.question[0].qname.gsub(/^r(\d+)\..*/, '\1').to_i
         if $num_nothing > MAX_NOTHING * 2 and num_req == $num_req
           delay = ($num_nothing - (MAX_NOTHING*2)) * DELAY_INCR
           delay = DELAY_MAX if delay > DELAY_MAX
@@ -306,7 +307,6 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           sleep delay
         end
 
-        num_req = resp.question[0].qname.gsub(/^r(\d+)\..*/, '\1').to_i
         if num_req == $num_req # only resend if we received the last ack
           sendreqs(socket, 1)
         end

@@ -1,0 +1,13 @@
+Source: tuns
+Section: net
+Priority: extra
+Maintainer: Lucas Nussbaum <lucas@lucas-nussbaum.net>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.0
+Homepage: http://perso.ens-lyon.fr/lucas.nussbaum/tuns.php
+
+Package: tuns
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: IP over DNS tunnel
+ IP over DNS tunnel.

@@ -1,0 +1,10 @@
+# Defaults for tuns initscript
+# sourced by /etc/init.d/tuns
+# installed at /etc/default/tuns by the maintainer scripts
+
+#
+# This is a POSIX shell fragment
+#
+
+# Additional options that are passed to the Daemon.
+DAEMON_OPTS=""

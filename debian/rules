@@ -13,6 +13,7 @@ DESTDIR=debian/tuns/$(shell ruby1.8 -rrbconfig -e "puts RbConfig::CONFIG['archdi
 install/tuns::
 	mkdir -p debian/tuns/usr/lib/ruby/1.8/tuns
 	cp -r lib/tuns/* debian/tuns/usr/lib/ruby/1.8/tuns/
+	cp -r lib/pNet-DNS/lib/Net debian/tuns/usr/lib/ruby/1.8/tuns/Net
 	mkdir -p ${DESTDIR}
 	cp base32-0.1.1/ext/base32.so ${DESTDIR}
 	cp tuns-client tuns-server tuns-netsetup debian/tuns/usr/sbin/

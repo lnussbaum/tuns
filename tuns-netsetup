@@ -4,6 +4,11 @@
 # Should do "the right thing".
 
 set -x
+set -e
+
+# Limits the MSS to the interface's MTU.
+iptables -I OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
 DEFR=$(netstat -rn | grep "^0.0.0.0 " | awk '{print $2}')
 route delete default gw $DEFR
 NS=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')

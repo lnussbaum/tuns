@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 $:.unshift File.join(File.dirname(__FILE__), '..', 'lib')
+$:.unshift File.join(File.dirname(__FILE__), '..', 'lib', 'tuns')
 require 'rbconfig'
 $:.unshift File.join(Config::CONFIG['rubylibdir'], 'tuns')
 require 'socket'
@@ -23,7 +24,7 @@ require 'timeout'
 require 'thread'
 require 'optparse'
 require 'tuns/tun'
-require 'tuns/Net/DNS'
+require 'Net/DNS'
 require 'tuns/base32'
 require 'tuns/dns'
 

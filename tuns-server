@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 $:.unshift File.join(File.dirname(__FILE__), '..', 'lib')
+require 'rbconfig'
+$:.unshift File.join(Config::CONFIG['rubylibdir'], 'tuns')
 require 'socket'
 require 'timeout'
 require 'thread'

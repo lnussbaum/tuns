@@ -6,5 +6,11 @@
 # This is a POSIX shell fragment
 #
 
-# Additional options that are passed to the Daemon.
+# Run TUNS?
+RUN="no"
+
+# Options that are passed to the Daemon.
+# See tuns-server -h
 DAEMON_OPTS=""
+
+

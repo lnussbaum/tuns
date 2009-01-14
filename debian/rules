@@ -15,4 +15,4 @@ install/tuns::
 	cp -r lib/* debian/tuns/usr/lib/ruby/1.8/tuns/
 	mkdir -p ${DESTDIR}
 	cp base32-0.1.1/ext/base32.so ${DESTDIR}
-	cp tuns-client tuns-server debian/tuns/usr/sbin/
+	cp tuns-client tuns-server tuns-netsetup debian/tuns/usr/sbin/

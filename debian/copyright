@@ -1,24 +1,35 @@
-This package was debianized by Lucas Nussbaum <lucas@lucas-nussbaum.net> on
-Wed, 14 Jan 2009 15:34:15 +0100.
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: tuns
+Source: FIXME <http://example.com/>
 
-It was downloaded from <url://example.com>
+Files: *
+Copyright: <years> <put author's name and email here>
+           <years> <likewise for another author>
+License: GPL-2+ (FIXME)
 
-Upstream Author(s):
+Files: debian/*
+Copyright: 2014 Lucas Nussbaum <lucas@debian.org>
+License: GPL-2+ (FIXME)
+Comment: the Debian packaging is licensed under the same terms as the original package.
 
-    <put author's name and email here>
-    <likewise for another author>
-
-Copyright:
-
-    <Copyright (C) YYYY Name OfAuthor>
-    <likewise for another author>
-
-License:
-
-    <Put the license of the package here indented by 4 spaces>
-
-The Debian packaging is (C) 2009, Lucas Nussbaum <lucas@lucas-nussbaum.net> and
-is licensed under the GPL, see `/usr/share/common-licenses/GPL'.
-
-# Please also look if there are files or directories which have a
-# different copyright/license attached and list them here.
+License: GPL-2+ (FIXME)
+ This program is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public
+ License as published by the Free Software Foundation; either
+ version 2 of the License, or (at your option) any later
+ version.
+ .
+ This program is distributed in the hope that it will be
+ useful, but WITHOUT ANY WARRANTY; without even the implied
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ PURPOSE.  See the GNU General Public License for more
+ details.
+ .
+ You should have received a copy of the GNU General Public
+ License along with this package; if not, write to the Free
+ Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ Boston, MA  02110-1301 USA
+ .
+ On Debian systems, the full text of the GNU General Public
+ License version 2 can be found in the file
+ `/usr/share/common-licenses/GPL-2'.

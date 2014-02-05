@@ -38,7 +38,7 @@ require 'tuns/dns'
 # + we are sending additional request packets
 # S(delay) we are sleeping, since server has nothing for us
 
-RECV_TIMEOUT = 2.5
+RECV_TIMEOUT = 0.5
 DELAY_INCR = 0.1
 DELAY_MAX = 2 # max delay before polls
 PKTSIZE=2000
@@ -53,6 +53,7 @@ $ip = "192.168.53.1"
 $rip = "192.168.53.2"
 $timeout = RECV_TIMEOUT
 $rtt = false
+$recvd_data = {}
 
 progname = File::basename($PROGRAM_NAME)
 opts = OptionParser::new do |opts|
@@ -315,24 +316,40 @@ th_recv = Thread::new($socket, $tun) do |socket, tun|
           sendreqs(socket, 1)
         end
       else
+        num_req = resp.question[0].qname.gsub(/^r(\d+)\..*/, '\1').to_i
         $num_nothing = 0
         if not $quiet
           print 'R'
           STDOUT.flush
         end
-        pack = dns_decode(text)
-        tun.syswrite(pack)
-        # send request for next packet.
-        sendreqs(socket, 1)
+        packet = dns_decode(text)
+        # duplicate check
+        if not ($recvd_data.has_key?(num_req) and $recvd_data[num_req] == packet)
+	  if packet != "\377\377\377\377\377\377\000\000\000\000\000\000\210\242\020\000\377\377\377\001\000\000\000\000\000\000\000\000\000\000\000\000"
+		tun.syswrite(packet)
+	  else
+	  	p packet
+		(0..(packet.length)).each do |i|
+                     p packet[i]
+		end
+                puts "SKIPPING"
+          end
+          $recvd_data[num_req] = packet
+          # FIXME add test for size of recvd_data and remove old items
+          # send request for next packet.
+          sendreqs(socket, 1)
+        end
       end
-    else resp.question[0].qname[0..0] == 'c' and resp.question[0].qtype == 'A'
+    elsif resp.question[0].qname[0..0] == 'c' and resp.question[0].qtype == 'A' and resp.answer[0].type == 'A'
       if resp.answer[0].address == '1.2.3.4'
         puts "Config: confirmed."
       elsif resp.answer[0].address == '4.3.2.1'
         puts "Config: unrecognized options! Strange."
       else
-        puts "unrecognized config reply: \n#{resp}"
+        puts "Unrecognized config reply: \n#{resp.answer[0]}"
       end
+    else
+      puts "Unrecognized reply: \n#{resp.answer[0]}"
     end
   end
 end

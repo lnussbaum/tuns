@@ -162,7 +162,7 @@ module Net
     class Resolver
       
       # @TODO@ should get config working on Windows
-      os = Config::CONFIG['host_os'] # e.g. "mswin32"
+      os = RbConfig::CONFIG['host_os'] # e.g. "mswin32"
       if (os=='mswin32')
         # Should we print a warning here? We don't *really* need the file...
         #        print "WARNING: You must have \\etc\\resolv.conf for Net::DNS to work correctly\n"

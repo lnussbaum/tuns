@@ -18,7 +18,7 @@
 $:.unshift File.join(File.dirname(__FILE__), '..', 'lib')
 $:.unshift File.join(File.dirname(__FILE__), '..', 'lib', 'tuns')
 require 'rbconfig'
-$:.unshift File.join(Config::CONFIG['rubylibdir'], 'tuns')
+$:.unshift File.join(RbConfig::CONFIG['rubylibdir'], 'tuns')
 require 'socket'
 require 'timeout'
 require 'thread'

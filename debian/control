@@ -7,7 +7,7 @@ Standards-Version: 3.9.4
 XS-Ruby-Versions: all
 
 Package: tuns
-Architecture: any
+Architecture: all
 XB-Ruby-Versions: ${ruby:Versions}
 Depends: ${shlibs:Depends}, ${misc:Depends}, ruby | ruby-interpreter, ruby-base32
 Description: IP over DNS tunnel

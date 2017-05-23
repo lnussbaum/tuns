@@ -16,7 +16,7 @@
 
 # This file contains wrappers to encode binary data in DNS labels.
 
-require 'tuns/base32'
+require 'base32'
 
 def dns_split(unsplit)
   split = ""
